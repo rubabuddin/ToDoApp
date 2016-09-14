@@ -13,7 +13,10 @@ import java.util.List;
 public class TaskItemSource {
     private static final int UPDATE_TEXT = 0;
     private static final int UPDATE_PRIORITY = 1;
-    private static final int UPDATE_DATE = 2;
+    private static final int UPDATE_YEAR = 2;
+    private static final int UPDATE_MONTH = 3;
+    private static final int UPDATE_DAY = 4;
+
 
     private SQLiteDatabase database;
     private TasksDatabaseHelper dbHelper;
@@ -22,7 +25,9 @@ public class TaskItemSource {
             TasksDatabaseHelper.KEY_ID,
             TasksDatabaseHelper.KEY_TEXT,
             TasksDatabaseHelper.KEY_PRIORITY,
-            TasksDatabaseHelper.KEY_DATE};
+            TasksDatabaseHelper.KEY_YEAR,
+            TasksDatabaseHelper.KEY_MONTH,
+            TasksDatabaseHelper.KEY_DAY};
 
     public TaskItemSource(Context context) {
         dbHelper = new TasksDatabaseHelper(context);
@@ -40,26 +45,27 @@ public class TaskItemSource {
         return database.isOpen();
     }
 
-    public boolean addTaskItem(TaskItem item){
+    public boolean addTaskItem(TaskItem taskItem){
         database = dbHelper.getWritableDatabase();
 
         ContentValues values = new ContentValues();
-        values.put(TasksDatabaseHelper.KEY_ID, item.getId());
-        values.put(TasksDatabaseHelper.KEY_TEXT, item.getTaskText());
-        values.put(TasksDatabaseHelper.KEY_PRIORITY, item.getTaskPriority());
-        values.put(TasksDatabaseHelper.KEY_DATE, item.getTaskDate());
+        values.put(TasksDatabaseHelper.KEY_ID, taskItem.getId());
+        values.put(TasksDatabaseHelper.KEY_TEXT, taskItem.getTaskText());
+        values.put(TasksDatabaseHelper.KEY_PRIORITY, taskItem.getTaskPriority());
+        values.put(TasksDatabaseHelper.KEY_YEAR, taskItem.getTaskYear());
+        values.put(TasksDatabaseHelper.KEY_MONTH, taskItem.getTaskMonth());
+        values.put(TasksDatabaseHelper.KEY_DAY, taskItem.getTaskDay());
 
         long result = database.insert(TasksDatabaseHelper.TABLE_NAME, null, values);
         return result != -1;
     }
 
-    public void deleteTaskItem(TaskItem item) {
+    public void deleteTaskItem(int taskId) {
         if (!this.isOpen()) {
             this.open();
         }
-        int id = item.getId();
         database.delete(TasksDatabaseHelper.TABLE_NAME, TasksDatabaseHelper.KEY_ID
-                + " = " + id, null);
+                + " = " + taskId, null);
     }
 
     public int updateTaskItem(int changedEntry, TaskItem item) {
@@ -73,8 +79,14 @@ public class TaskItemSource {
             case UPDATE_PRIORITY:
                 values.put(TasksDatabaseHelper.KEY_PRIORITY, item.getTaskPriority());
                 break;
-            case UPDATE_DATE:
-                values.put(TasksDatabaseHelper.KEY_DATE, item.getTaskDate());
+            case UPDATE_YEAR:
+                values.put(TasksDatabaseHelper.KEY_YEAR, item.getTaskYear());
+                break;
+            case UPDATE_MONTH:
+                values.put(TasksDatabaseHelper.KEY_MONTH, item.getTaskMonth());
+                break;
+            case UPDATE_DAY:
+                values.put(TasksDatabaseHelper.KEY_DAY, item.getTaskDay());
                 break;
         }
 
@@ -82,8 +94,12 @@ public class TaskItemSource {
         return result;
     }
 
+    public void preserveOrder(){
+        database.execSQL("SELECT * FROM tasks_table ORDER BY priority DESC");
+    }
+
     public List<TaskItem> getAllTaskItems(List<TaskItem> taskItems){
-        Cursor cursor = database.query(TasksDatabaseHelper.TABLE_NAME, allColumns, null, null, null, null, null);
+        Cursor cursor = database.query(TasksDatabaseHelper.TABLE_NAME, allColumns, null, null, null, null, "priority DESC");
 
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
@@ -100,8 +116,10 @@ public class TaskItemSource {
         int id = cursor.getInt(0);
         String text = cursor.getString(1);
         int priority = cursor.getInt(2);
-        String date = cursor.getString(3);
+        int year = cursor.getInt(3);
+        int month = cursor.getInt(4);
+        int day = cursor.getInt(5);
 
-        return new TaskItem(id, text, priority, date);
+        return new TaskItem(id, text, priority, year, month, day);
     }
 }

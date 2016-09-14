@@ -11,10 +11,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.Spinner;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.Calendar;
@@ -26,17 +25,17 @@ public class EditItemActivity extends AppCompatActivity{
 
     EditText etEditItem;
     Spinner spPriority;
-    TextView tvDate;
-    Button btnSetDate;
+    DatePicker datePicker;
 
     boolean taskExists;
 
-    int year, month, day, hour, minute;
+    int year, month, day;
     int priority;
-    int id;
+    int id, pos;
 
     Intent callIntent;
     final int SET_DATE_REQUEST_CODE = 0;
+    final int RESULT_DELETED = 91792;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,40 +46,30 @@ public class EditItemActivity extends AppCompatActivity{
         setSupportActionBar(toolbar);
 
         callIntent = getIntent();
-        taskExists = callIntent.getBooleanExtra("exists", true);
+        taskExists = callIntent.getBooleanExtra("exists", false);
+        pos = callIntent.getIntExtra("pos", 0);
+        id = callIntent.getIntExtra("id", 0);
 
         setupEditText(taskExists);
         setupPrioritySpinner(taskExists);
-        setupDateView(taskExists);
-
-        btnSetDate = (Button) findViewById(R.id.btnSetDate);
-        btnSetDate.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                setDate();
-            }
-        });
-
+        setupDatePicker(taskExists);
     }
 
-    private void setupDateView(boolean taskExists){
-        tvDate = (TextView) findViewById(R.id.tvDate);
+    private void setupDatePicker(boolean taskExists){
+        datePicker = (DatePicker) findViewById(R.id.datePicker);
 
         if(taskExists){
-            String[] dateFormatted = callIntent.getStringExtra("date").split("/");
-            month = Integer.valueOf(dateFormatted[0]);
-            day = Integer.valueOf(dateFormatted[1]);
-            year = Integer.valueOf(dateFormatted[2]);
+            year = callIntent.getIntExtra("year", 0);
+            month = callIntent.getIntExtra("month", 0);
+            day = callIntent.getIntExtra("day", 0);
         } else {
-            Calendar c = Calendar.getInstance();
+            final Calendar c = Calendar.getInstance();
             year = c.get(Calendar.YEAR);
-            month = c.get(Calendar.MONTH) + 1; //months start from 0
+            month = c.get(Calendar.MONTH); //months start from 0
             day = c.get(Calendar.DAY_OF_MONTH);
+            datePicker.init(year, month, day, null);
         }
-
-        String dateSet = ((month < 10) ? "0" + month : month) + "/"
-                + ((day < 10) ? "0" + day : day) + "/" + year;
-        tvDate.setText(dateSet);
+        datePicker.updateDate(year, month, day);
     }
 
     private void setupEditText(boolean taskExists){
@@ -106,7 +95,7 @@ public class EditItemActivity extends AppCompatActivity{
             public void afterTextChanged(Editable s) {
                 if(s.length() == 0){
                     etEditItem.setError("Empty Field");
-                    //Menu menu = (Menu) findViewById(R.menu.menu_task);
+                    Menu menu = (Menu) findViewById(R.menu.menu_task);
                     //menu.getItem(0).setEnabled(false);
                 }
                 else{
@@ -143,20 +132,19 @@ public class EditItemActivity extends AppCompatActivity{
         });
     }
 
-    public void setDate(){
-        Intent intent = new Intent(this, SetDateActivity.class);
-        startActivityForResult(intent, SET_DATE_REQUEST_CODE);
-    }
+
 
     public void onClickSave(){
         Intent passbackData = getIntent();
 
         Calendar now = GregorianCalendar.getInstance();
         Calendar c = Calendar.getInstance();
-        c.set(Calendar.YEAR, year);
-        c.set(Calendar.MONTH, month - 1);
-        c.set(Calendar.DAY_OF_MONTH, day);
+        year = datePicker.getYear();
+        month = datePicker.getMonth();
+        day = datePicker.getDayOfMonth();
+
         String taskText = etEditItem.getText().toString();
+
         int id = callIntent.getIntExtra("id", 0);
 
         //make sure user didn't pick past date
@@ -165,36 +153,29 @@ public class EditItemActivity extends AppCompatActivity{
             passbackData.putExtra("month", month);
             passbackData.putExtra("year", year);
             passbackData.putExtra("priority", priority);
-            passbackData.putExtra("year", year);
             passbackData.putExtra(TASK_ITEM_KEY, taskText);
             passbackData.putExtra("exists", taskExists);
             passbackData.putExtra("id", id);
+
             setResult(RESULT_OK, passbackData);
             finish();
         }
-        else
-            Toast.makeText(this, "Set completion to future date", Toast.LENGTH_SHORT).show();
+        else {
+            Toast.makeText(this, "Set completion to future date" + year, Toast.LENGTH_SHORT).show();
+        }
     }
 
 
     public void onClickDelete(){
-     //   if(taskExists){
             Intent passbackData = getIntent();
-            setResult(RESULT_CANCELED, passbackData);
+            passbackData.putExtra("pos", pos);
+            passbackData.putExtra("id", id);
+            passbackData.putExtra("exists", taskExists);
+            setResult(RESULT_DELETED, passbackData);
             finish();
-       // }
-     //   else{
-      //      finish();
-     //   }
     }
 
     public boolean onCreateOptionsMenu(Menu menu) {
-
-        //disable save button if new task and fields are empty
-       // if(!taskExists){
-         //   menu.getItem(0).setEnabled(false);
-        //}
-
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_task, menu);
         return true;
@@ -208,12 +189,17 @@ public class EditItemActivity extends AppCompatActivity{
                 day = data.getIntExtra("day", 17);
                 month = data.getIntExtra("month", 10);
                 year = data.getIntExtra("year", 2016);
-                String dateSet = ((month < 10) ? "0" + month : month) + "/"
-                        + ((day < 10) ? "0" + day : day) + "/" + year;
-                tvDate.setText(dateSet);
+                datePicker.updateDate(year, month, day);
             }
         }
     }
+    @Override
+    public void onBackPressed() {
+        Intent passbackData = getIntent();
+        setResult(RESULT_CANCELED, passbackData);
+        super.onBackPressed();
+    }
+
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {

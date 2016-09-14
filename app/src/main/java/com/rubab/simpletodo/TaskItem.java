@@ -10,14 +10,18 @@ public class TaskItem{
     private int id;
     private String taskText;
     private int taskPriority;
-    private String taskDate;
+    private int taskYear;
+    private int taskMonth;
+    private int taskDay;
 
-    public TaskItem(int id, String taskText, int taskPriority, String taskDate) {
-        super();
+    public TaskItem(int id, String taskText, int taskPriority, int taskYear, int taskMonth, int taskDay) {
         this.id = id;
         this.taskText = taskText;
         this.taskPriority = taskPriority;
-        this.taskDate = taskDate;
+        this.taskYear = taskYear;
+        this.taskMonth = taskMonth;
+        this.taskDay = taskDay;
+
     }
 
     public String getTaskText(){
@@ -36,12 +40,28 @@ public class TaskItem{
         this.taskPriority = taskPriority;
     }
 
-    public String getTaskDate(){
-        return taskDate;
+    public int getTaskYear(){
+        return taskYear;
     }
 
-    public void setTaskDate(String taskDate) {
-        this.taskDate = taskDate;
+    public void setTaskYear(int taskYear) {
+        this.taskYear = taskYear;
+    }
+
+    public int getTaskMonth(){
+        return taskMonth;
+    }
+
+    public void setTaskMonth(int taskMonth) {
+        this.taskMonth = taskMonth;
+    }
+
+    public int getTaskDay(){
+        return taskDay;
+    }
+
+    public void setTaskDay(int taskDay) {
+        this.taskDay = taskDay;
     }
 
     public int getId() {

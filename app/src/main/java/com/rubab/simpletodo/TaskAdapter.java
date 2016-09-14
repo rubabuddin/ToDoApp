@@ -8,13 +8,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
  * Created by rubab.uddin on 9/10/2016.
  */
 public class TaskAdapter extends ArrayAdapter<TaskItem> {
 
-    TaskItemSource taskItemSource;
+    //TaskItemSource taskItemSource;
     List<TaskItem> data = null;
     Context context;
     int layoutResourceId;
@@ -53,9 +54,11 @@ public class TaskAdapter extends ArrayAdapter<TaskItem> {
         }
 
         final TaskItem taskItem = data.get(position);
-
         holder.tvText.setText(taskItem.getTaskText());
-        holder.tvDate.setText(taskItem.getTaskDate());
+
+        String dateFormatted = taskItem.getTaskMonth() + "/" + taskItem.getTaskDay() + "/" + taskItem.getTaskYear();
+        holder.tvDate.setText(dateFormatted);
+
         int priority = taskItem.getTaskPriority();
 
         switch(priority) {

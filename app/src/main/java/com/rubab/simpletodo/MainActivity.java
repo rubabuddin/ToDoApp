@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -26,10 +27,13 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int UPDATE_TEXT = 0;
     private static final int UPDATE_PRIORITY = 1;
-    private static final int UPDATE_DATE = 2;
+    private static final int UPDATE_YEAR = 2;
+    private static final int UPDATE_MONTH = 3;
+    private static final int UPDATE_DAY = 4;
     private static final String TASK_ID_LIST = "taskIdList";
 
     final int SET_DATE_REQUEST_CODE = 0;
+    final int RESULT_DELETED = 91792;
 
     TaskItemSource taskItemSource;
     List<TaskItem> taskItems;
@@ -71,7 +75,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int pos, long id) {
                 TaskItem selectedItem = taskItems.get(pos);
-                taskItemSource.deleteTaskItem(selectedItem);
+                int idToDelete = selectedItem.getId();
+                taskItemSource.deleteTaskItem(idToDelete);
                 taskItems.remove(pos);
                 taskAdapter.notifyDataSetChanged();
                 return true;
@@ -84,9 +89,13 @@ public class MainActivity extends AppCompatActivity {
                 TaskItem selectedItem = taskItems.get(pos);
                 intent.putExtra("id", selectedItem.getId());
                 intent.putExtra("exists", true);
+                intent.putExtra("pos", pos);
                 intent.putExtra("taskText", selectedItem.getTaskText());
                 intent.putExtra("priority", selectedItem.getTaskPriority());
-                intent.putExtra("date", selectedItem.getTaskDate());
+                intent.putExtra("year", selectedItem.getTaskYear());
+                intent.putExtra("month", selectedItem.getTaskMonth());
+                intent.putExtra("day", selectedItem.getTaskDay());
+
                 startActivityForResult(intent, SET_DATE_REQUEST_CODE);
             }
         });
@@ -94,45 +103,67 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
         super.onActivityResult(requestCode, resultCode, data);
-
+        boolean taskExists = data.getBooleanExtra("exists", false);
         // REQUEST_CODE is defined above
-        if (resultCode != RESULT_CANCELED) {
-            String taskText = data.getStringExtra("taskText");
-            int priority = data.getIntExtra("priority", 0);
-            int day = data.getIntExtra("day", 17);
-            int month = data.getIntExtra("month", 10);
-            int year = data.getIntExtra("year", 2016);
-            String date = ((month < 10) ? "0" + month : month) + "/"
-                    + ((day < 10) ? "0" + day : day) + "/" + year;
-
-            TaskItem taskItem = new TaskItem(taskId, taskText, priority, date);
-            boolean taskExists = data.getBooleanExtra("exists", false);
-            if (!taskExists) {
-                boolean addSuccess = taskItemSource.addTaskItem(taskItem);
-                if (addSuccess == true) {
-                    taskItems.add(new TaskItem(taskId, taskText, priority, date));
+        if (requestCode == SET_DATE_REQUEST_CODE) {
+            //delete button pressed
+            if (resultCode == RESULT_CANCELED) {
+                Toast.makeText(this, "No changes made", Toast.LENGTH_SHORT).show();
+            } else if (resultCode == RESULT_DELETED) {
+                if (taskExists) {
+                    int idToDelete = data.getIntExtra("id", 0);
+                    int posToDelete = data.getIntExtra("pos", 0);
+                    taskItemSource.deleteTaskItem(idToDelete);
+                    taskItems.remove(posToDelete);
                     taskAdapter.notifyDataSetChanged();
-                    Toast.makeText(this, "New task added: " + taskText, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Task deleted", Toast.LENGTH_SHORT).show();
                 }
             } else {
-                int id = data.getIntExtra("id", 0);
-                taskItemSource.updateTaskItem(UPDATE_TEXT, taskItem);
-                taskItemSource.updateTaskItem(UPDATE_PRIORITY, taskItem);
-                taskItemSource.updateTaskItem(UPDATE_DATE, taskItem);
-                for (TaskItem existingItem : taskItems) {
-                    if (existingItem.getId() == id) {
-                        existingItem.setTaskText(taskText);
-                        existingItem.setTaskPriority(priority);
-                        existingItem.setTaskDate(date);
+                String taskText = data.getStringExtra("taskText");
+                int priority = data.getIntExtra("priority", 0);
+                int day = data.getIntExtra("day", 17);
+                int month = data.getIntExtra("month", 10);
+                int year = data.getIntExtra("year", 2016);
+                taskId++;
+
+                TaskItem taskItem = new TaskItem(taskId, taskText, priority, year, month, day);
+
+                if (!taskExists) {
+                    //adding new task
+                    boolean addSuccess = taskItemSource.addTaskItem(taskItem);
+                    if (addSuccess == true) {
+                        taskItems.add(new TaskItem(taskId, taskText, priority, year, month, day));
+                        taskAdapter.notifyDataSetChanged();
+                        Toast.makeText(this, "New task added: " + taskText, Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "Error task not added", Toast.LENGTH_SHORT).show();
                     }
+                } else {
+                    //updating existing task
+                    int id = data.getIntExtra("id", 0);
+                    taskItemSource.updateTaskItem(UPDATE_TEXT, taskItem);
+                    taskItemSource.updateTaskItem(UPDATE_PRIORITY, taskItem);
+                    taskItemSource.updateTaskItem(UPDATE_YEAR, taskItem);
+                    taskItemSource.updateTaskItem(UPDATE_MONTH, taskItem);
+                    taskItemSource.updateTaskItem(UPDATE_DAY, taskItem);
+
+                    for (TaskItem existingItem : taskItems) {
+                        if (existingItem.getId() == id) {
+                            existingItem.setTaskText(taskText);
+                            existingItem.setTaskPriority(priority);
+                            existingItem.setTaskYear(year);
+                            existingItem.setTaskMonth(month);
+                            existingItem.setTaskDay(day);
+                        }
+                    }
+                    taskAdapter.notifyDataSetChanged();
+                    Toast.makeText(this, "Task modified to: " + taskText, Toast.LENGTH_SHORT).show();
                 }
-                taskAdapter.notifyDataSetChanged();
-                Toast.makeText(this, "Task modified to: " + taskText, Toast.LENGTH_SHORT).show();
             }
         }
     }
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -142,14 +173,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.add_item) {
-            //launchAddItem();
-            return true;
-        } else if (id == R.id.action_settings)
-            return true;
-        else
-            return super.onOptionsItemSelected(item);
+        return super.onOptionsItemSelected(item);
     }
 
     public void launchAddTask(View v) {
@@ -185,7 +209,6 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = settings.edit();
         editor.putInt("taskId", taskId);
 
-        // Commit the edits!
         editor.apply();
 
         if (taskItemSource.isOpen()) {
@@ -201,7 +224,6 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = settings.edit();
         editor.putInt("taskId", taskId);
 
-        // Commit the edits!
         editor.apply();
 
         if (taskItemSource.isOpen()) {
