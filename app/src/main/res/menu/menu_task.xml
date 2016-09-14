@@ -15,8 +15,6 @@
         app:showAsAction="ifRoom"
         android:title="Delete Task">
     </item>
-
-
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"

@@ -1,4 +1,17 @@
 <resources>
     <string name="app_name">Get Stuff Done</string>
     <string name="action_settings">Settings</string>
+
+    <string name="edit_item">Edit item below:</string>
+    <string name="set_priority">Set Priority:</string>
+    <string name="priority_low">LOW</string>
+    <string name="priority_med">MEDIUM</string>
+    <string name="priority_hi">HIGH</string>
+
+    <string-array name="priority_array">
+        <item>Low</item>
+        <item>Medium</item>
+        <item>High</item>
+    </string-array>
+
 </resources>

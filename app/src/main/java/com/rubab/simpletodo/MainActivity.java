@@ -1,6 +1,8 @@
 package com.rubab.simpletodo;
 
+import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -10,8 +12,6 @@ import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -19,24 +19,25 @@ import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
 
-import org.apache.commons.io.FileUtils;
-
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    ArrayList<String> items;
-    ArrayAdapter<String> itemsAdapter;
+    private static final int UPDATE_TEXT = 0;
+    private static final int UPDATE_PRIORITY = 1;
+    private static final int UPDATE_DATE = 2;
+    private static final String TASK_ID_LIST = "taskIdList";
+
+    final int SET_DATE_REQUEST_CODE = 0;
+
+    TaskItemSource taskItemSource;
+    List<TaskItem> taskItems;
+    TaskAdapter taskAdapter;
     ListView lvItems;
 
+    private static int taskId;
 
-
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
     private GoogleApiClient client;
 
     @Override
@@ -44,19 +45,24 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Find the toolbar view inside the activity layout
+        SharedPreferences settings = getSharedPreferences(TASK_ID_LIST, 0);
+        taskId = settings.getInt("taskId", 0);
+
+        taskItemSource = new TaskItemSource(this);
+        taskItemSource.open();
+
+        taskItems = new ArrayList<>();
+        taskItemSource.getAllTaskItems(taskItems);
+
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        // Sets the Toolbar to act as the ActionBar for this Activity window.
-        // Make sure the toolbar exists in the activity and is not null
         setSupportActionBar(toolbar);
 
-        readItems();
+        taskAdapter = new TaskAdapter(this, R.layout.list_item, taskItems);
         lvItems = (ListView) findViewById(R.id.lvItems);
-        itemsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, items);
-        lvItems.setAdapter(itemsAdapter);
+        assert lvItems != null;
+        lvItems.setAdapter(taskAdapter);
+
         setupListViewListener();
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
         client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
@@ -64,59 +70,66 @@ public class MainActivity extends AppCompatActivity {
         lvItems.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int pos, long id) {
-                items.remove(pos);
-                itemsAdapter.notifyDataSetChanged();
-                writeItems();
+                TaskItem selectedItem = taskItems.get(pos);
+                taskItemSource.deleteTaskItem(selectedItem);
+                taskItems.remove(pos);
+                taskAdapter.notifyDataSetChanged();
                 return true;
             }
         });
         lvItems.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int pos, long id) {
-                Intent intent = new Intent(getApplicationContext(), EditItemActivity.class);
-                intent.putExtra(EditItemActivity.TASK_ITEM_KEY, items.get(pos));
-                startActivityForResult(intent, pos);
+                Intent intent = new Intent(getBaseContext(), EditItemActivity.class);
+                TaskItem selectedItem = taskItems.get(pos);
+                intent.putExtra("id", selectedItem.getId());
+                intent.putExtra("exists", true);
+                intent.putExtra("taskText", selectedItem.getTaskText());
+                intent.putExtra("priority", selectedItem.getTaskPriority());
+                intent.putExtra("date", selectedItem.getTaskDate());
+                startActivityForResult(intent, SET_DATE_REQUEST_CODE);
             }
         });
     }
 
-    private void readItems() {
-        File filesDir = getFilesDir();
-        File todoFile = new File(filesDir, "todo.txt");
-        try {
-            items = new ArrayList<>(FileUtils.readLines(todoFile));
-        } catch (IOException e) {
-            items = new ArrayList<>();
-        }
-    }
-
-    private void writeItems() {
-        File filesDir = getFilesDir();
-        File todoFile = new File(filesDir, "todo.txt");
-        try {
-            FileUtils.writeLines(todoFile, items);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
         // REQUEST_CODE is defined above
-        if (resultCode == RESULT_OK) {
-            // Extract name value from result extras
-            String newTask = data.getExtras().getString(EditItemActivity.TASK_ITEM_KEY);
-            items.remove(requestCode);
-            items.add(requestCode, newTask);
-            itemsAdapter.notifyDataSetChanged();
-            writeItems();
-            Toast.makeText(this, "Task modified to: " + newTask, Toast.LENGTH_SHORT).show();
-        }
-        if (resultCode == RESULT_CANCELED) {
-            items.remove(requestCode);
-            itemsAdapter.notifyDataSetChanged();
-            writeItems();
-            Toast.makeText(this, "Task removed", Toast.LENGTH_SHORT).show();
+        if (resultCode != RESULT_CANCELED) {
+            String taskText = data.getStringExtra("taskText");
+            int priority = data.getIntExtra("priority", 0);
+            int day = data.getIntExtra("day", 17);
+            int month = data.getIntExtra("month", 10);
+            int year = data.getIntExtra("year", 2016);
+            String date = ((month < 10) ? "0" + month : month) + "/"
+                    + ((day < 10) ? "0" + day : day) + "/" + year;
+
+            TaskItem taskItem = new TaskItem(taskId, taskText, priority, date);
+            boolean taskExists = data.getBooleanExtra("exists", false);
+            if (!taskExists) {
+                boolean addSuccess = taskItemSource.addTaskItem(taskItem);
+                if (addSuccess == true) {
+                    taskItems.add(new TaskItem(taskId, taskText, priority, date));
+                    taskAdapter.notifyDataSetChanged();
+                    Toast.makeText(this, "New task added: " + taskText, Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                int id = data.getIntExtra("id", 0);
+                taskItemSource.updateTaskItem(UPDATE_TEXT, taskItem);
+                taskItemSource.updateTaskItem(UPDATE_PRIORITY, taskItem);
+                taskItemSource.updateTaskItem(UPDATE_DATE, taskItem);
+                for (TaskItem existingItem : taskItems) {
+                    if (existingItem.getId() == id) {
+                        existingItem.setTaskText(taskText);
+                        existingItem.setTaskPriority(priority);
+                        existingItem.setTaskDate(date);
+                    }
+                }
+                taskAdapter.notifyDataSetChanged();
+                Toast.makeText(this, "Task modified to: " + taskText, Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -127,33 +140,22 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    public void onAddItem(View v) {
-        EditText etNewItem = (EditText) findViewById(R.id.etNewItem);
-
-        String itemText = etNewItem.getText().toString();
-        //String priority = "HIGH";
-       // String currentDateTimeString = DateFormat.getDateTimeInstance().format(new Date());
-
-        //ListItem itemBundle = new ListItem(itemText,priority,currentDateTimeString);
-
-        itemsAdapter.add(itemText);
-        etNewItem.setText("");
-        writeItems();
-    }
-
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.add_item) {
+            //launchAddItem();
             return true;
-        }
+        } else if (id == R.id.action_settings)
+            return true;
+        else
+            return super.onOptionsItemSelected(item);
+    }
 
-        return super.onOptionsItemSelected(item);
+    public void launchAddTask(View v) {
+        Intent intent = new Intent(this, EditItemActivity.class);
+        intent.putExtra("exists", false);
+        startActivityForResult(intent, SET_DATE_REQUEST_CODE);
     }
 
     @Override
@@ -176,23 +178,34 @@ public class MainActivity extends AppCompatActivity {
         AppIndex.AppIndexApi.start(client, viewAction);
     }
 
+    public void onPause(){
+        super.onPause();
+
+        SharedPreferences settings = getSharedPreferences(TASK_ID_LIST, Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putInt("taskId", taskId);
+
+        // Commit the edits!
+        editor.apply();
+
+        if (taskItemSource.isOpen()) {
+            taskItemSource.close();
+        }
+    }
+
     @Override
     public void onStop() {
         super.onStop();
 
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "Main Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app URL is correct.
-                Uri.parse("android-app://com.rubab.simpletodo/http/host/path")
-        );
-        AppIndex.AppIndexApi.end(client, viewAction);
-        client.disconnect();
+        SharedPreferences settings = getSharedPreferences(TASK_ID_LIST, Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putInt("taskId", taskId);
+
+        // Commit the edits!
+        editor.apply();
+
+        if (taskItemSource.isOpen()) {
+            taskItemSource.close();
+        }
     }
 }
