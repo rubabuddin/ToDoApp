@@ -1,14 +1,22 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:context="com.rubab.simpletodo.MainActivity">
+    tools:context="com.rubab.simpletodo.EditItemActivity">
 
     <item
-        android:id="@+id/add_item"
-        android:icon="@drawable/ic_note_add_white_24dp"
+        android:id="@+id/save_item"
+        android:icon="@drawable/ic_done_white_24dp"
         app:showAsAction="ifRoom"
-        android:title="Add Task">
+        android:title="Save Task">
     </item>
+    <item
+        android:id="@+id/delete_item"
+        android:icon="@drawable/ic_delete_white_24dp"
+        app:showAsAction="ifRoom"
+        android:title="Delete Task">
+    </item>
+
+
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"
